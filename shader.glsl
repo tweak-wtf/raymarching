@@ -30,7 +30,7 @@ float ray_march(vec3 ray_origin, vec3 ray_direction){
 	for(int i; i<MAX_RAY_STEP; i++){
 		vec3 pos = ray_origin + ray_direction * distance_origin;
 		float distance_surface = get_distance(pos);
-		distance_origin = distance_surface;
+		distance_origin += distance_surface;
 
 		if(distance_origin > MAX_DISTANCE || distance_surface < MIN_HIT_DIST) break;
 	}
