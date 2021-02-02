@@ -1,49 +1,58 @@
+uniform vec2 uRes;      //GLSL Top resolution
+uniform float iTime;
+
 // raymarcher parameters
-uniform int MAX_RAY_STEPS;                     // the max steps before giving up
+uniform int MAX_STEPS;                     // the max steps before giving up
 uniform float MIN_SURFACE_DIST;            // the starting distance away from the eye
 uniform float MAX_DISTANCE;                // the max distance away from the eye to march before giving up
 
-uniform vec3 uray_origin;
-uniform vec2 uRes;      //GLSL Top resolution
-uniform float uTime;
-
 //Light parameters
-uniform float ulight_energy;
-uniform float ulight_falloff;
-uniform int ulight_type;
+uniform float light_energy;
+uniform float light_falloff;
+uniform int light_type;
 
 
-out vec4 fragColor;
 
+// Example Pixel Shader
+
+// uniform float exampleUniform;
 
 float get_distance(vec3 pos){
-	vec4 sphere_origin = vec4(0.,1.,5.,1);
+	vec4 sphere_origin = vec4(0, 0, 6, 1);
+	
+	
+	float sphere_distance = length(pos - sphere_origin.xyz) - sphere_origin.w;
+	
+	float ground_distance = pos.y;
+	
+	float d = min(ground_distance, sphere_distance);
 
-	float distance_sphere = length(pos-sphere_origin.xyz) - sphere_origin.w;
-	float distance_ground = pos.y;
-
-	float distance_surface = min(distance_sphere, distance_ground);
-
-	return distance_surface;
+    return d;
 
 }
 
 
-// ray_origin = cam_origin
-float ray_march(vec3 ray_origin, vec3 ray_direction)
-{
-	float distance_origin = 0.;
 
-	for(int i; i<MAX_RAY_STEPS; i++){
-		vec3 pos = ray_origin + ray_direction * distance_origin;
+float ray_march(vec3 cam_pos, vec3 ray_direction){
+	//Distance traveled so far.
+	float distance_origin = 0;
+	
+	for(int i; i < MAX_STEPS; i++){
+		vec3 pos = cam_pos + ray_direction * distance_origin; 
+		
 		float distance_surface = get_distance(pos);
-		distance_origin += distance_surface;
+		
+		if( distance_surface < MIN_SURFACE_DIST){
+            return distance_origin;
+        }
+        distance_origin += distance_surface;
 
-		if(distance_origin > MAX_DISTANCE || distance_surface < MIN_SURFACE_DIST) break;
+        if( distance_origin >= MAX_DISTANCE){
+            break;
+        }
 	}
 	return distance_origin;
 }
-
 
 //estimation of the Surface normal at point P
 vec3 surface_normal(vec3 pos){
@@ -62,8 +71,7 @@ vec3 surface_normal(vec3 pos){
     return normalize(normal);
 }
 
-float global_illumination(vec3 closest_surface_point, vec3 light_position)
-{
+float global_illumination(vec3 closest_surface_point, vec3 light_position){
     int bounces = 3;
     float distance_traveled = 0.;
     float intensity = 1 ;
@@ -88,13 +96,11 @@ float global_illumination(vec3 closest_surface_point, vec3 light_position)
     return intensity;
 }
 
-
-float get_light(vec3 closest_surface_point, vec3 CameraPos)
-{
+float get_light(vec3 closest_surface_point, vec3 CameraPos){
     vec3 light_position =  vec3(0., 5., 5.);
 
     //Rotate Light with input
-    light_position.xz += vec2(sin(uTime), cos(uTime));
+    light_position.xz += vec2(sin(iTime), cos(iTime));
 
     //Get light direction and the normal vector of the point thats  hit on the surface.
     vec3 light_direction = normalize(light_position - closest_surface_point);
@@ -115,21 +121,22 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
     
     float gi_light = global_illumination(closest_surface_point, light_position) ;//+ light_intensity;
     
+    //return shadowing(closest_surface_point, light_position, normal_vector);
     //No Falloff
     float intensity = clamp(light_intensity, 0., 1.);
     //Linear Falloff 
      
-    float linear_intensity = intensity * ulight_energy *( ulight_falloff / ( ulight_falloff * distance_to_light));
+    float linear_intensity = intensity * light_energy *( light_falloff / ( light_falloff * distance_to_light));
     //Quadratic Falloff
-    float quadratic_intensity = intensity * ulight_energy *( pow(ulight_falloff, 2) / ( pow(ulight_falloff, 2) + pow(distance_to_light, 2)) );
+    float quadratic_intensity = intensity * light_energy *( pow(light_falloff, 2) / ( pow(light_falloff, 2) + pow(distance_to_light, 2)) );
 
-    if(ulight_type == 0) return intensity;
+    if(light_type == 0) return intensity;
 
-    if(ulight_type == 1) return linear_intensity;
+    if(light_type == 1) return linear_intensity;
 
-    if(ulight_type == 2) return quadratic_intensity;
+    if(light_type == 2) return quadratic_intensity;
 
-    if(ulight_type == 3) return gi_light;
+    if(light_type == 3) return gi_light;
 
     
 
@@ -139,34 +146,28 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
 
 
 
-
-
-////////////////////////////////
-////////////////////////////////
-////////////////////////////////
-vec4 ray_main(vec2 uv)
-{
-	vec3 color = vec3(0.);
-
-	// vec3 ray_origin = vec3(-5., 1., 0.);
-	vec3 ray_origin = uray_origin;
-	vec3 ray_direction = vec3(uv.x, uv.y, 1.);	//nice 
-	
-	float surface_distance = ray_march(ray_origin, ray_direction);
-
-	vec3 closest_surface_point = ray_origin + ray_direction * surface_distance;
-	float diffuse = get_light(closest_surface_point, ray_origin);
-
-	color = vec3(diffuse);
-	return vec4(color, 1.);
-}
-
-
+out vec4 fragColor;
 void main()
 {
-	vec2 uv = vUV.st;
-	uv = uv - 0.5;	// (gl_FragCoord.xy - 0.5 * uRes.xy)/ uRes.y;
+	vec3 col = vec3(0.);
 	
-	vec4 color = ray_main(uv);
+	vec2 uv =(gl_FragCoord.xy - uRes.xy / 2.0)/uRes.y;
+	
+	//CameraPos or RayOrigin
+	vec3 cam_pos = vec3(0.,1.,0.);
+	//Ray direction 
+	vec3 ray_direction = normalize(vec3(uv.x, uv.y, 1.));
+	
+	float surface_distance = ray_march(cam_pos, ray_direction);
+	
+    vec3 closest_surface_point = cam_pos + ray_direction * surface_distance;
+
+    float diffuse = get_light(closest_surface_point);
+	
+	col = vec3(diffuse); 
+	
+	vec4 color = vec4(col,1.0);
 	fragColor = TDOutputSwizzle(color);
+
+
 }
