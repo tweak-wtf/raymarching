@@ -11,6 +11,10 @@ uniform float uTime;
 uniform float ulight_energy;
 uniform float ulight_falloff;
 uniform int ulight_type;
+uniform vec3 light_position;
+
+//Material Param
+uniform vec3 mat_color;
 
 
 out vec4 fragColor;
@@ -48,14 +52,14 @@ float ray_march(vec3 ray_origin, vec3 ray_direction)
 //estimation of the Surface normal at point P
 vec3 surface_normal(vec3 pos){
 
-    vec2 e = vec2(0.00001, 0); //small offset to be able to calculate the slope
+    vec2 e = vec2(0.001, 0); //small offset to be able to calculate the slope // IF you decrease the value it affects the gi in a funny weird way no clue why though
     float d = get_distance(pos);
 
     //calculate the slope around the given point to be able to get the normals.
-    vec3 normal = vec3(
-        d - get_distance(pos - e.xyy),
-        d - get_distance(pos - e.yxy),
-        d - get_distance(pos - e.yyx)
+    vec3 normal = d- vec3(
+        get_distance(pos - e.xyy),
+        get_distance(pos - e.yxy),
+        get_distance(pos - e.yyx)
     );
 
     //Normalize to get the normal vector.
@@ -66,54 +70,65 @@ float global_illumination(vec3 closest_surface_point, vec3 light_position)
 {
     int bounces = 3;
     float distance_traveled = 0.;
-    float intensity = 1 ;
+    float intensity = 0 ;
     vec3 new_pos = closest_surface_point;
-    vec3 new_direction = normalize(light_position - closest_surface_point);
+    vec3 new_direction = normalize(closest_surface_point - light_position);
+    vec3 normal_at_point = surface_normal(new_pos);
 
+    //distance_traveled += ray_march(new_pos = normal_at_point *0.01, new_direction);
 
+    //new_pos = new_pos + distance_traveled * new_direction;
+
+    //intensity = max(max(new_pos.x, new_pos.y), new_pos.y)*0.01;
+
+    //intensity = clamp(distance_traveled,0,1);
+  
+    
     for(int i; i < bounces; i++){
 
 
         vec3 old_pos = new_pos;
         vec3 old_direction = new_direction;
 
-        vec3 normal_at_point = surface_normal(new_pos);
         
-        distance_traveled += ray_march(new_pos + normal_at_point * MIN_SURFACE_DIST, new_direction );
+        distance_traveled += ray_march(new_pos  + normal_at_point * 0.01 , new_direction );
+
 		vec3 new_pos = vec3(old_pos + old_direction * distance_traveled);
+        vec3 normal_at_point = surface_normal(new_pos);
+
         vec3 new_direction = normalize(vec3(old_pos - new_pos));
-        intensity += clamp(dot(new_direction, normal_at_point),0,100000000)/(i*1000000);
+
+        intensity = min(intensity,clamp(dot(new_direction, normal_at_point),0,1));
         
     };    
+    
     return intensity;
 }
 
 
 float get_light(vec3 closest_surface_point, vec3 CameraPos)
 {
-    vec3 light_position =  vec3(0., 5., 5.);
-
+    
+    vec3 new_light_position = light_position;
     //Rotate Light with input
-    light_position.xz += vec2(sin(uTime), cos(uTime));
+    new_light_position.xz += vec2(sin(uTime), cos(uTime));
 
     //Get light direction and the normal vector of the point thats  hit on the surface.
-    vec3 light_direction = normalize(light_position - closest_surface_point);
+    vec3 light_direction = normalize(new_light_position - closest_surface_point);
     vec3 normal_vector = surface_normal(closest_surface_point);
 
-    vec3 view_direction = normalize(CameraPos - closest_surface_point);
 
     float light_intensity = dot(light_direction, normal_vector);
-    float spec_intensity = pow(dot(light_direction, view_direction),1);
     
 
     float shadow_distance = ray_march(closest_surface_point + normal_vector * MIN_SURFACE_DIST, light_direction);
-    float distance_to_light = length(light_position-closest_surface_point);
+    float distance_to_light = length(new_light_position-closest_surface_point);
 
 
 
-    if(shadow_distance < distance_to_light) light_intensity *= .1;
+    if(shadow_distance < distance_to_light) light_intensity *= 0.1;
     
-    float gi_light = global_illumination(closest_surface_point, light_position) ;//+ light_intensity;
+    float gi_light = global_illumination(closest_surface_point, new_light_position) ;//+ light_intensity;
     
     //No Falloff
     float intensity = clamp(light_intensity, 0., 1.);
@@ -123,21 +138,47 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
     //Quadratic Falloff
     float quadratic_intensity = intensity * ulight_energy *( pow(ulight_falloff, 2) / ( pow(ulight_falloff, 2) + pow(distance_to_light, 2)) );
 
+    //Phong shading
+    
+
     if(ulight_type == 0) return intensity;
 
     if(ulight_type == 1) return linear_intensity;
 
     if(ulight_type == 2) return quadratic_intensity;
 
-    if(ulight_type == 3) return gi_light;
-
-    
-
     return quadratic_intensity;
 }
 
 
 
+float phong(vec3 closest_surface_point, vec3 CameraPos){
+    
+    float ambient = 0.0;
+    float shininess = 1.0;
+    vec3 new_light_position = light_position;
+    new_light_position.xz += vec2(sin(uTime), cos(uTime));
+  
+    //Get light direction and the normal vector of the point thats  hit on the surface.
+    vec3 light_direction = normalize(new_light_position - closest_surface_point);
+    vec3 normal_vector = surface_normal(closest_surface_point);
+
+    vec3 view_direction = normalize(CameraPos - closest_surface_point);
+
+
+    //  Get light intensity at given point.
+    float light_intensity = get_light(closest_surface_point, CameraPos);
+
+
+    float specular_intensity = pow(max(0.0,dot(reflect(-light_direction, normal_vector), view_direction)), shininess);
+
+
+    float phong_shading = ambient + light_intensity + specular_intensity;
+
+
+    return phong_shading;
+
+}
 
 
 
@@ -147,7 +188,6 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
 vec4 ray_main(vec2 uv)
 {
 	vec3 color = vec3(0.);
-
 	// vec3 ray_origin = vec3(-5., 1., 0.);
 	vec3 ray_origin = uray_origin;
 	vec3 ray_direction = vec3(uv.x, uv.y, 1.);	//nice 
@@ -156,8 +196,9 @@ vec4 ray_main(vec2 uv)
 
 	vec3 closest_surface_point = ray_origin + ray_direction * surface_distance;
 	float diffuse = get_light(closest_surface_point, ray_origin);
+    float phong_mat = phong(closest_surface_point, ray_origin);
 
-	color = vec3(diffuse);
+	color =    vec3(phong_mat);
 	return vec4(color, 1.);
 }
 
