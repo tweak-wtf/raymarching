@@ -76,13 +76,13 @@ float global_illumination(vec3 closest_surface_point, vec3 light_position)
 
         vec3 old_pos = new_pos;
         vec3 old_direction = new_direction;
-        vec3 new_pos = vec3(old_pos + old_direction * distance_traveled);
-        vec3 new_direction = normalize(vec3(old_pos - new_pos));
+
         vec3 normal_at_point = surface_normal(new_pos);
         
         distance_traveled += ray_march(new_pos + normal_at_point * MIN_SURFACE_DIST, new_direction );
-        
-        intensity += clamp(dot(new_direction, normal_at_point),0,100000000)/(i*100);
+		vec3 new_pos = vec3(old_pos + old_direction * distance_traveled);
+        vec3 new_direction = normalize(vec3(old_pos - new_pos));
+        intensity += clamp(dot(new_direction, normal_at_point),0,100000000)/(i*1000000);
         
     };    
     return intensity;
@@ -103,7 +103,7 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
     vec3 view_direction = normalize(CameraPos - closest_surface_point);
 
     float light_intensity = dot(light_direction, normal_vector);
-    float spec_intensity = pow(dot(light_direction, view_direction),0.5);
+    float spec_intensity = pow(dot(light_direction, view_direction),1);
     
 
     float shadow_distance = ray_march(closest_surface_point + normal_vector * MIN_SURFACE_DIST, light_direction);
