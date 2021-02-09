@@ -19,19 +19,50 @@ uniform vec3 mat_color;
 
 out vec4 fragColor;
 
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+// https://www.youtube.com/watch?v=AfKGMUDWfuE
+float smin( float a, float b, float k ) {
+    float h = clamp( 0.5+0.5*(b-a)/k, 0., 1. );
+    return mix( b, a, h ) - k*h*(1.0-h);
+}
 
 float get_distance(vec3 pos){
-	vec4 sphere_origin = vec4(0.,1.,5.,1);
+    vec4 sphere_two_origin;
+    float distance_sphere_two;
+    vec4 sphere_origin = vec4(1.,0.,0.,1);
+    float distance_surface = length(pos-sphere_origin.xyz) - sphere_origin.w;
+    sphere_origin = vec4(-1.,0.,0.,1);
+    distance_surface = min(distance_surface, length(pos-sphere_origin.xyz) - sphere_origin.w);
+    int sphere_count = 0;
+    // for (int i=0; i<5; i++){
+    //     origin = 
+    // }
+    while(sphere_count < 15){
+        sphere_two_origin = vec4(0.,(uTime.x)*rand(vec2(0,sphere_count)),0.,1);
+        // if (sphere_count == 14){
+        //     sphere_two_origin = vec4(0.,(uTime.x+3)*rand(vec2(0,sphere_count)),0.,1+(1+uTime.x)*rand(vec2(0,sphere_count)));
+        // }
+        distance_sphere_two = length(pos-sphere_two_origin.xyz) - sphere_two_origin.w;
+        distance_surface = smin(distance_surface, distance_sphere_two,.2);
 
-	float distance_sphere = length(pos-sphere_origin.xyz) - sphere_origin.w;
-	float distance_ground = pos.y;
 
-	float distance_surface = min(distance_sphere, distance_ground);
+
+        sphere_count += 1;
+    }
+    
+    //float distance_ground = pos.y+ 0.5;
+
+    // float distance_surface2 = mix(distance_sphere + 0.1, distance_sphere_two + 0.1, uTime.x);
+    
+    //  distance_surface = rand(0.2,);
+    //distance_surface = min( distance_surface, distance_ground);
+
 
 	return distance_surface;
 
 }
-
 
 // ray_origin = cam_origin
 float ray_march(vec3 ray_origin, vec3 ray_direction)
@@ -131,7 +162,7 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
     float gi_light = global_illumination(closest_surface_point, new_light_position) ;//+ light_intensity;
     
     //No Falloff
-    float intensity = clamp(light_intensity, 0., 1.);
+    float intensity = clamp(light_intensity, 0., 1.)+1;
     //Linear Falloff 
      
     float linear_intensity = intensity * ulight_energy *( ulight_falloff / ( ulight_falloff * distance_to_light));
@@ -192,6 +223,7 @@ vec4 ray_main(vec2 uv)
 	vec3 ray_origin = uray_origin;
 	vec3 ray_direction = vec3(uv.x, uv.y, 1.);	//nice 
 	
+    // float geo = ray_march()
 	float surface_distance = ray_march(ray_origin, ray_direction);
     //float geo_distance = ray_march(ray)
 
