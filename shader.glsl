@@ -121,7 +121,7 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
     float light_intensity = dot(light_direction, normal_vector);
     
 
-    float shadow_distance = ray_march(closest_surface_point + normal_vector * MIN_SURFACE_DIST, light_direction);
+    float shadow_distance = ray_march(closest_surface_point + normal_vector * 0.1, light_direction);
     float distance_to_light = length(new_light_position-closest_surface_point);
 
 
@@ -193,13 +193,14 @@ vec4 ray_main(vec2 uv)
 	vec3 ray_direction = vec3(uv.x, uv.y, 1.);	//nice 
 	
 	float surface_distance = ray_march(ray_origin, ray_direction);
+    //float geo_distance = ray_march(ray)
 
 	vec3 closest_surface_point = ray_origin + ray_direction * surface_distance;
 	float diffuse = get_light(closest_surface_point, ray_origin);
     float phong_mat = phong(closest_surface_point, ray_origin);
 
 	color =    vec3(phong_mat);
-	return vec4(color, 1.);
+	return vec4(color, 1.);          
 }
 
 
