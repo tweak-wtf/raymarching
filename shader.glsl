@@ -117,10 +117,8 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
     vec3 light_direction = normalize(new_light_position - closest_surface_point);
     vec3 normal_vector = surface_normal(closest_surface_point);
 
-    vec3 view_direction = normalize(CameraPos - closest_surface_point);
 
-    float light_intensity = clamp(dot(light_direction, normal_vector),0,1);
-    float spec_intensity = pow(dot(light_direction, view_direction),1);
+    float light_intensity = dot(light_direction, normal_vector);
     
 
     float shadow_distance = ray_march(closest_surface_point + normal_vector * MIN_SURFACE_DIST, light_direction);
@@ -168,7 +166,7 @@ float phong(vec3 closest_surface_point, vec3 CameraPos){
     vec3 view_direction = normalize(CameraPos - closest_surface_point);
 
 
-    //float light_intensity = max(0.0, dot(light_direction, normal_vector));
+    //  Get light intensity at given point.
     float light_intensity = get_light(closest_surface_point, CameraPos);
 
 
