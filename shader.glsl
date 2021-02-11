@@ -16,8 +16,11 @@ uniform vec3 light_position;
 //Material Param
 uniform vec3 mat_color;
 
+uniform vec3 gedoens;
+
 
 out vec4 fragColor;
+
 
 float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
@@ -28,28 +31,72 @@ float smin( float a, float b, float k ) {
     return mix( b, a, h ) - k*h*(1.0-h);
 }
 
-float get_distance(vec3 pos){
-    vec4 sphere_two_origin;
-    float distance_sphere_two;
+float get_distance2(vec3 pos){
+    // vec4 sphere_two_origin;
+    // float distance_sphere_two;
     vec4 sphere_origin = vec4(1.,0.,0.,1);
     float distance_surface = length(pos-sphere_origin.xyz) - sphere_origin.w;
     sphere_origin = vec4(-1.,0.,0.,1);
-    distance_surface = min(distance_surface, length(pos-sphere_origin.xyz) - sphere_origin.w);
+    // distance_surface = min(distance_surface, length(pos-sphere_origin.xyz) - sphere_origin.w);
 
-    int sphere_count = 0;
-    while(sphere_count < 15){
-        sphere_two_origin = vec4(0.,(uTime.x * 4.5)*rand(vec2(0,sphere_count)),0.,1);
-        // if (sphere_count == 14){
-        //     sphere_two_origin = vec4(0.,(uTime.x+3)*rand(vec2(0,sphere_count)),0.,1+(1+uTime.x)*rand(vec2(0,sphere_count)));
-        // }
-        distance_sphere_two = length(pos-sphere_two_origin.xyz) - sphere_two_origin.w;
-        distance_surface = smin(distance_surface, distance_sphere_two,.2);
+    // int sphere_count = 0;
+    // while(sphere_count < 15){
+    //     sphere_two_origin = vec4(0.,(uTime.x * 4.5)*rand(vec2(0,sphere_count)),0.,1);
+    //     // if (sphere_count == 14){
+    //     //     sphere_two_origin = vec4(0.,(uTime.x+3)*rand(vec2(0,sphere_count)),0.,1+(1+uTime.x)*rand(vec2(0,sphere_count)));
+    //     // }
+    //     distance_sphere_two = length(pos-sphere_two_origin.xyz) - sphere_two_origin.w;
+    //     distance_surface = smin(distance_surface, distance_sphere_two,.2);
 
 
 
-        sphere_count += 1;
-    }
+    //     sphere_count += 1;
+    // }
 	return distance_surface;
+}
+
+float get_distance(vec3 pos){
+    // vec4 sphere_two_origin;
+    // float distance_sphere_two;
+    vec4 sphere_origin = vec4(1.,0.,0.,1);
+    float distance_surface = length(pos-sphere_origin.xyz) - sphere_origin.w;
+    sphere_origin = vec4(-1.,0.,0.,1);
+    // distance_surface = min(distance_surface, length(pos-sphere_origin.xyz) - sphere_origin.w);
+
+    // int sphere_count = 0;
+    // while(sphere_count < 15){
+    //     sphere_two_origin = vec4(0.,(uTime.x * 4.5)*rand(vec2(0,sphere_count)),0.,1);
+    //     // if (sphere_count == 14){
+    //     //     sphere_two_origin = vec4(0.,(uTime.x+3)*rand(vec2(0,sphere_count)),0.,1+(1+uTime.x)*rand(vec2(0,sphere_count)));
+    //     // }
+    //     distance_sphere_two = length(pos-sphere_two_origin.xyz) - sphere_two_origin.w;
+    //     distance_surface = smin(distance_surface, distance_sphere_two,.2);
+
+
+
+    //     sphere_count += 1;
+    // }
+	return distance_surface;
+}
+
+float opRep( vec3 p, vec3 c)
+{
+    vec3 q = mod(p+0.5*c,c)-0.5*c;
+    return get_distance( q );
+}
+
+float opTwist(  vec3 p )
+{
+    const float k = 3.0; // or some other amount
+    float c = cos(k*p.y);
+    float s = sin(k*p.y);
+    mat2  m = mat2(c,-s,s,c);
+    vec3  q = vec3(m*p.xz,p.y);
+    float result = get_distance(q);
+    // result += vec3(0.1, 0.1, 0.1);
+    // float result = opRep(q, gedoens);
+    return result;
+    // return primitive;
 }
 
 // ray_origin = cam_origin
@@ -59,7 +106,21 @@ float ray_march(vec3 ray_origin, vec3 ray_direction)
 
 	for(int i; i<MAX_RAY_STEPS; i++){
 		vec3 pos = ray_origin + ray_direction * distance_origin;
-		float distance_surface = get_distance(pos);
+		float distance_surface = opTwist(pos);
+		distance_origin += distance_surface;
+
+		if(distance_origin > MAX_DISTANCE || distance_surface < MIN_SURFACE_DIST) break;
+	}
+	return distance_origin;
+}
+
+float ray_march2(vec3 ray_origin, vec3 ray_direction)
+{
+	float distance_origin = 0.;
+
+	for(int i; i<MAX_RAY_STEPS; i++){
+		vec3 pos = ray_origin + ray_direction * distance_origin;
+		float distance_surface = get_distance2(pos);
 		distance_origin += distance_surface;
 
 		if(distance_origin > MAX_DISTANCE || distance_surface < MIN_SURFACE_DIST) break;
@@ -213,7 +274,10 @@ vec4 ray_main(vec2 uv)
 
     // float geo = ray_march()
 	float surface_distance = ray_march(ray_origin, ray_direction);
+	float surface_distance2 = ray_march2(ray_origin, ray_direction);
     //float geo_distance = ray_march(ray)
+
+    surface_distance = min(surface_distance, surface_distance2);
 
 	vec3 closest_surface_point = ray_origin + ray_direction * surface_distance;
 	float diffuse = get_light(closest_surface_point, ray_origin);
