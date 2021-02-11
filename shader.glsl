@@ -19,19 +19,38 @@ uniform vec3 mat_color;
 
 out vec4 fragColor;
 
-
-float get_distance(vec3 pos){
-	vec4 sphere_origin = vec4(0.,1.,5.,1);
-
-	float distance_sphere = length(pos-sphere_origin.xyz) - sphere_origin.w;
-	float distance_ground = pos.y;
-
-	float distance_surface = min(distance_sphere, distance_ground);
-
-	return distance_surface;
-
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+// https://www.youtube.com/watch?v=AfKGMUDWfuE
+float smin( float a, float b, float k ) {
+    float h = clamp( 0.5+0.5*(b-a)/k, 0., 1. );
+    return mix( b, a, h ) - k*h*(1.0-h);
 }
 
+float get_distance(vec3 pos){
+    vec4 sphere_two_origin;
+    float distance_sphere_two;
+    vec4 sphere_origin = vec4(1.,0.,0.,1);
+    float distance_surface = length(pos-sphere_origin.xyz) - sphere_origin.w;
+    sphere_origin = vec4(-1.,0.,0.,1);
+    distance_surface = min(distance_surface, length(pos-sphere_origin.xyz) - sphere_origin.w);
+
+    int sphere_count = 0;
+    while(sphere_count < 15){
+        sphere_two_origin = vec4(0.,(uTime.x * 4.5)*rand(vec2(0,sphere_count)),0.,1);
+        // if (sphere_count == 14){
+        //     sphere_two_origin = vec4(0.,(uTime.x+3)*rand(vec2(0,sphere_count)),0.,1+(1+uTime.x)*rand(vec2(0,sphere_count)));
+        // }
+        distance_sphere_two = length(pos-sphere_two_origin.xyz) - sphere_two_origin.w;
+        distance_surface = smin(distance_surface, distance_sphere_two,.2);
+
+
+
+        sphere_count += 1;
+    }
+	return distance_surface;
+}
 
 // ray_origin = cam_origin
 float ray_march(vec3 ray_origin, vec3 ray_direction)
@@ -82,15 +101,15 @@ float global_illumination(vec3 closest_surface_point, vec3 light_position)
     //intensity = max(max(new_pos.x, new_pos.y), new_pos.y)*0.01;
 
     //intensity = clamp(distance_traveled,0,1);
-  
-    
+
+
     for(int i; i < bounces; i++){
 
 
         vec3 old_pos = new_pos;
         vec3 old_direction = new_direction;
 
-        
+
         distance_traveled += ray_march(new_pos  + normal_at_point * 0.01 , new_direction );
 
 		vec3 new_pos = vec3(old_pos + old_direction * distance_traveled);
@@ -99,16 +118,16 @@ float global_illumination(vec3 closest_surface_point, vec3 light_position)
         vec3 new_direction = normalize(vec3(old_pos - new_pos));
 
         intensity = min(intensity,clamp(dot(new_direction, normal_at_point),0,1));
-        
-    };    
-    
+
+    };
+
     return intensity;
 }
 
 
 float get_light(vec3 closest_surface_point, vec3 CameraPos)
 {
-    
+
     vec3 new_light_position = light_position;
     //Rotate Light with input
     new_light_position.xz += vec2(sin(uTime), cos(uTime));
@@ -119,7 +138,7 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
 
 
     float light_intensity = dot(light_direction, normal_vector);
-    
+
 
     float shadow_distance = ray_march(closest_surface_point + normal_vector * 0.1, light_direction);
     float distance_to_light = length(new_light_position-closest_surface_point);
@@ -127,19 +146,19 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
 
 
     if(shadow_distance < distance_to_light) light_intensity *= 0.1;
-    
+
     float gi_light = global_illumination(closest_surface_point, new_light_position) ;//+ light_intensity;
-    
+
     //No Falloff
-    float intensity = clamp(light_intensity, 0., 1.);
-    //Linear Falloff 
-     
+    float intensity = clamp(light_intensity, 0., 1.)+1;
+    //Linear Falloff
+
     float linear_intensity = intensity * ulight_energy *( ulight_falloff / ( ulight_falloff * distance_to_light));
     //Quadratic Falloff
     float quadratic_intensity = intensity * ulight_energy *( pow(ulight_falloff, 2) / ( pow(ulight_falloff, 2) + pow(distance_to_light, 2)) );
 
     //Phong shading
-    
+
 
     if(ulight_type == 0) return intensity;
 
@@ -153,12 +172,12 @@ float get_light(vec3 closest_surface_point, vec3 CameraPos)
 
 
 float phong(vec3 closest_surface_point, vec3 CameraPos){
-    
+
     float ambient = 0.0;
     float shininess = 1.0;
     vec3 new_light_position = light_position;
     new_light_position.xz += vec2(sin(uTime), cos(uTime));
-  
+
     //Get light direction and the normal vector of the point thats  hit on the surface.
     vec3 light_direction = normalize(new_light_position - closest_surface_point);
     vec3 normal_vector = surface_normal(closest_surface_point);
@@ -190,8 +209,9 @@ vec4 ray_main(vec2 uv)
 	vec3 color = vec3(0.);
 	// vec3 ray_origin = vec3(-5., 1., 0.);
 	vec3 ray_origin = uray_origin;
-	vec3 ray_direction = vec3(uv.x, uv.y, 1.);	//nice 
-	
+	vec3 ray_direction = vec3(uv.x, uv.y, 1.);	//nice
+
+    // float geo = ray_march()
 	float surface_distance = ray_march(ray_origin, ray_direction);
     //float geo_distance = ray_march(ray)
 
@@ -200,7 +220,7 @@ vec4 ray_main(vec2 uv)
     float phong_mat = phong(closest_surface_point, ray_origin);
 
 	color =    vec3(phong_mat);
-	return vec4(color, 1.);          
+	return vec4(color, 1.);
 }
 
 
@@ -208,7 +228,7 @@ void main()
 {
 	vec2 uv = vUV.st;
 	uv = uv - 0.5;	// (gl_FragCoord.xy - 0.5 * uRes.xy)/ uRes.y;
-	
+
 	vec4 color = ray_main(uv);
 	fragColor = TDOutputSwizzle(color);
 }
