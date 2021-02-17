@@ -128,6 +128,13 @@ float ray_march2(vec3 ray_origin, vec3 ray_direction)
 	return distance_origin;
 }
 
+float get_scene(vec3 ray_origin, vec3 ray_direction){
+	float surface_distance = ray_march(ray_origin, ray_direction);
+	//float surface_distance2 = ray_march2(ray_origin, ray_direction);
+    //float geo_distance = ray_march(ray)}
+    //surface_distance = min(surface_distance, surface_distance2);
+    return surface_distance;
+}
 
 //estimation of the Surface normal at point P
 vec3 surface_normal(vec3 pos){
@@ -272,14 +279,12 @@ vec4 ray_main(vec2 uv)
 	vec3 ray_origin = uray_origin;
 	vec3 ray_direction = vec3(uv.x, uv.y, 1.);	//nice
 
-    // float geo = ray_march()
-	float surface_distance = ray_march(ray_origin, ray_direction);
-	float surface_distance2 = ray_march2(ray_origin, ray_direction);
-    //float geo_distance = ray_march(ray)
+    float scene = get_scene(ray_origin, ray_direction);
 
-    surface_distance = min(surface_distance, surface_distance2);
 
-	vec3 closest_surface_point = ray_origin + ray_direction * surface_distance;
+	vec3 closest_surface_point = ray_origin + ray_direction * scene;
+
+
 	float diffuse = get_light(closest_surface_point, ray_origin);
     float phong_mat = phong(closest_surface_point, ray_origin);
 
