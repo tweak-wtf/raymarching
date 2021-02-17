@@ -85,15 +85,27 @@ float opRep( vec3 p, vec3 c)
     return get_distance( q );
 }
 
-float opTwist(  vec3 p )
+float spaceship(  vec3 p )
 {
+    vec3 pos = p + vec3(cos(uTime),uTime*2, sin(uTime)*0.5);
     const float k = 3.0; // or some other amount
-    float c = cos(k*p.y);
-    float s = sin(k*p.y);
+    float c = cos(k*pos.y);
+    float s = sin(k*pos.y);
     mat2  m = mat2(c,-s,s,c);
-    vec3  q = vec3(m*p.xz,p.y);
+    vec3  q = vec3(m*pos.xz,pos.y);
+
+
+
     float result = get_distance(q);
+
+    vec4 sphere_origin = vec4(1.,0.,0.,1);
+    float distance_surface = length(pos-sphere_origin.xyz) - sphere_origin.w;
+
+    result = smin(result, distance_surface, 0.5);
     // result += vec3(0.1, 0.1, 0.1);
+
+
+
     // float result = opRep(q, gedoens);
     return result;
     // return primitive;
@@ -106,7 +118,7 @@ float ray_march(vec3 ray_origin, vec3 ray_direction)
 
 	for(int i; i<MAX_RAY_STEPS; i++){
 		vec3 pos = ray_origin + ray_direction * distance_origin;
-		float distance_surface = opTwist(pos);
+		float distance_surface = spaceship(pos);
 		distance_origin += distance_surface;
 
 		if(distance_origin > MAX_DISTANCE || distance_surface < MIN_SURFACE_DIST) break;
@@ -139,14 +151,14 @@ float get_scene(vec3 ray_origin, vec3 ray_direction){
 //estimation of the Surface normal at point P
 vec3 surface_normal(vec3 pos){
 
-    vec2 e = vec2(0.001, 0); //small offset to be able to calculate the slope // IF you decrease the value it affects the gi in a funny weird way no clue why though
-    float d = get_distance(pos);
+    vec2 e = vec2(0.002/(100*uTime), 0); //small offset to be able to calculate the slope // IF you decrease the value it affects the gi in a funny weird way no clue why though
+    float d = spaceship(pos);
 
     //calculate the slope around the given point to be able to get the normals.
     vec3 normal = d- vec3(
-        get_distance(pos - e.xyy),
-        get_distance(pos - e.yxy),
-        get_distance(pos - e.yyx)
+        spaceship(pos - e.xyy),
+        spaceship(pos - e.yxy),
+        spaceship(pos - e.yyx)
     );
 
     //Normalize to get the normal vector.
