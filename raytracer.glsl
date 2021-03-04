@@ -20,6 +20,8 @@ float hit_sphere(vec3 ray_origin, vec3 ray_direction, float radius, vec3 center)
     //  t1 = ----------------          t1 = ----------------
     //          2A                              2A
     // below we break up the equation for easier reading and only calculate the part under the square root as this defines the Solutions we will get out of it 
+    // If we use the result of the whole equation and just dont care about the negative results we get the closest distance to the Surface we hit.
+    // We dont care about the negative results because they would be behind the camera.
 
     float a = dot(ray_direction, ray_direction);
     float b = 2*dot(ray_direction,(ray_origin-center));
@@ -30,8 +32,8 @@ float hit_sphere(vec3 ray_origin, vec3 ray_direction, float radius, vec3 center)
     return hit_distance;
 
 }
-
-vec3 normal_shading(float hit_distance, vec3 ray_direction, vec3 ray_origin, vec3 center){
+/*
+vec3 normal_shading(vec3 ray_direction, vec3 ray_origin, vec3 center){
     // At some point we add shading here for now its just the surface normal of the sphere.
     // you can calculate the normal of a sphere if you take the closest hitpoint and subtract
     // that with the center of the given sphere. 
@@ -45,6 +47,42 @@ vec3 normal_shading(float hit_distance, vec3 ray_direction, vec3 ray_origin, vec
 
 }
 
+*/
+vec3 calculate_object_normal(float hit_distance, vec3 hit_point){
+    vec2 offset = vec2(0.0001,0.);
+
+    vec3 normal = hit_distance - hit_point - vec3(
+        length(hit_point - offset.xyy),
+        length(hit_point - offset.yxy),
+        length(hit_point - offset.yyx)
+    );
+
+    return normalize(normal);
+}
+vec3 BSDF(float hit_distance, vec3 hit_point, vec3 ray_direction, vec3 light_direction){
+    vec3 sphere_center = vec3(0., 0., 5.);
+    float shininess = 20.0;
+    vec3 surface_normal = normalize(hit_point - sphere_center);
+    //vec3 surface_normal = calculate_object_normal(hit_distance, hit_point);
+    // Ambient light amount
+    // I = ka *Ia
+    float ambient_power = 1;
+    vec3 ambient_amount = vec3(0.1);
+    vec3 ambient_intensity = ambient_amount * ambient_power;
+
+    // Diffuse amount 
+    // I = kd * dot(normal, lightdirection)
+    vec3 diffuse_amount = vec3(0.5, 0.5, 0.5);
+
+    vec3 diffuse_intensity = diffuse_amount * clamp(dot(light_direction, surface_normal),0,1); // dot()
+    // Specular amount 
+    // I = ks* dot(view_direction, reflected_vector)^shininess
+    vec3 specular_amount = vec3(1);
+    vec3 specular_intensity = specular_amount * clamp(pow( dot(ray_direction,reflect(-light_direction, surface_normal)), shininess),0,1);
+
+
+    return ambient_intensity + diffuse_intensity + specular_intensity;
+}
 
 vec4 ray_main(vec2 uv){
     // Main Ray function calls all the shit we need to have a cool image in the end.
@@ -58,9 +96,14 @@ vec4 ray_main(vec2 uv){
 
 
     float hit_distance  = hit_sphere(ray_origin, ray_direction, sphere_radius, sphere_center);
+    vec3 hit_point = ray_origin + ray_direction*hit_distance;
+    
+    vec3 light_origin = vec3(0., -5., 5.);
+    vec3 light_direction = normalize((hit_point - light_origin));
+
 
     if( hit_distance > 0){
-        color = vec4(normal_shading(hit_distance, ray_direction, ray_origin, sphere_center),1);                
+        color = vec4(BSDF(hit_distance, hit_point, ray_direction, light_direction),1);                
     }else{
         color = vec4(0.,0.,0.,1.);
     }
